@@ -3,4 +3,4 @@
 aicomp
 
 # Ignore the file containing the devkey and urlencoded username
-credentials
+credentials.h
