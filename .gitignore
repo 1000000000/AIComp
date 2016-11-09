@@ -1,0 +1,6 @@
+# Ignore object files and the binary
+*.o
+aicomp
+
+# Ignore the file containing the devkey and urlencoded username
+credentials
