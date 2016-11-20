@@ -10,7 +10,7 @@ ai_state* ai_state_init() {
 	return NULL;
 }
 
-move_enum next_move(ai_state* state, json_object* current_board) {
+move_enum next_move(ai_state* state, game_state* gstate) {
 	return rand() % 16;
 }
 

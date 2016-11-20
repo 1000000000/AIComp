@@ -1,5 +1,7 @@
+#ifndef __ai_h_
+#define __ai_h_
 
-#include <json-c/json.h>
+#include "game_state.h"
 
 typedef enum {
 	MOVE_UP = 0,
@@ -24,6 +26,8 @@ typedef struct ai_state ai_state;
 
 ai_state* ai_state_init();
 
-move_enum next_move(ai_state* state, json_object* current_board);
+move_enum next_move(ai_state* state, game_state* gstate);
 
 void ai_state_free(ai_state* state);
+
+#endif//__ai_h_
