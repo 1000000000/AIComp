@@ -33,3 +33,8 @@ void game_state_dec_ref(game_state* state) {
 unsigned xy_to_index(game_state* state, unsigned x, unsigned y) {
 	return y*state->board_length + x;
 }
+
+void index_to_xy(game_state* state, unsigned index, unsigned* x, unsigned* y) {
+	*x = index % state->board_length;
+	*y = index / state->board_length;
+}

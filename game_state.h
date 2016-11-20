@@ -41,4 +41,6 @@ void game_state_dec_ref(game_state* state);
 
 unsigned xy_to_index(game_state* state, unsigned x, unsigned y);
 
+void index_to_xy(game_state* state, unsigned index, unsigned* x, unsigned* y);
+
 #endif//__game_state_h_
