@@ -21,8 +21,7 @@ main.o: main.c ai.h
 	$(CC) $(CFLAGS) -o $@ main.o game_state.o $< $(LDFLAGS)
 
 .PHONY: debug
-debug: CFLAGS += -g -O0
-#debug: DEFS += -DDEBUG
+debug: CFLAGS += -g -O0 -DDEBUG
 debug: all
 
 .PHONY: clean
