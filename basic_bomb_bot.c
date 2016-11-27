@@ -20,9 +20,10 @@ unsigned num_cells(game_state* gs) {
 
 void print_array(game_state* gs, unsigned* arr) {
 	unsigned i;
+	printf("\n");
 	for (i = 0; i < num_cells(gs); ++i) {
 		if (arr[i] == -1) {
-			printf("X");
+			printf(".");
 		} else {
 			printf("%u", arr[i]);
 		}
