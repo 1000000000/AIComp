@@ -63,10 +63,12 @@ void extract_player(json_object* data, player* player) {
 	player->y = json_object_get_int(cur);
 }
 
-void extract_board(json_object* data, int* board) {
-	int i;
-	for (i = 0; i < json_object_array_length(data); ++i) {
-		board[i] = json_object_get_int(json_object_array_get_idx(data, i));
+void extract_board(json_object* data, int* board, unsigned board_length) {
+	int x, y;
+	for (x = 0; x < board_length; ++x) {
+		for (y = 0; y < board_length; ++y) {
+			board[x + board_length*y] = json_object_get_int(json_object_array_get_idx(data, y + board_length*x));
+		}
 	}
 }
 
@@ -119,9 +121,9 @@ game_state* extract_state(json_object* game) {
 	json_object_object_get_ex(game, "opponent", &cur2);
 	extract_player(cur2, &new_state->opponent);
 	json_object_object_get_ex(game, "hardBlockBoard", &cur2);
-	extract_board(cur2, new_state->hard_block_board);
+	extract_board(cur2, new_state->hard_block_board, board_size);
 	json_object_object_get_ex(game, "softBlockBoard", &cur2);
-	extract_board(cur2, new_state->soft_block_board);
+	extract_board(cur2, new_state->soft_block_board, board_size);
 	json_object_object_get_ex(game, "moveIterator", &cur2);
 	new_state->turn_start = !json_object_get_int(cur2);
 	json_object_object_get_ex(game, "playerIndex", &cur2);

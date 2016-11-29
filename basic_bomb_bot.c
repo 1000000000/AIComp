@@ -56,7 +56,7 @@ int is_bomb_or_trail(game_state* gs, unsigned x, unsigned y) {
 
 int is_walkable(game_state* gs, unsigned x, unsigned y) {
 	return !gs->hard_block_board[xy_to_index(gs,x,y)]
-		&& !gs->soft_block_board[xy_to_index(gs,y,x)]
+		&& !gs->soft_block_board[xy_to_index(gs,x,y)]
 		&& !is_bomb_or_trail(gs, x, y)
 		&& gs->opponent.x != x && gs->opponent.y != y;
 }
@@ -117,31 +117,111 @@ unsigned min(unsigned a, unsigned b) {
 	}
 }
 
-void place_future_trails(unsigned* thresh, bomb* bomb, game_state* gs, unsigned* axis, int dir) {
-	unsigned true_range = bomb->range, backup = *axis;
-	while (diff(*axis,backup) < true_range && ((dir == -1 && *axis > 0) || (dir == 1 && *axis + 1 < gs->board_length))) {
+direction rev_trail_direction(bomb* bomb, unsigned* axis, int dir) {
+	direction ret;
+	if (&bomb->x == axis) {
+		ret = 1;
+	} else {
+		ret = 2;
+	}
+	return ret - dir;
+}
+
+void direction_to_axis_dir(direction d, bomb* bomb, unsigned** axis, int* dir) {
+	if (d % 2 == 0) {
+		*axis = &bomb->x;
+	} else {
+		*axis = &bomb->y;
+	}
+	if (d < 2) {
+		*dir = -1;
+	} else {
+		*dir = 1;
+	}
+
+}
+
+int is_portal(game_state* gs, unsigned x, unsigned y, direction d) {
+	return (gs->opponent.orange.x == x && gs->opponent.orange.y == y && gs->opponent.orange.dir == d)
+			|| (gs->opponent.blue.x == x && gs->opponent.blue.y == y && gs->opponent.blue.dir == d)
+			|| (gs->self.orange.x == x && gs->self.orange.y == y && gs->self.orange.dir == d)
+			|| (gs->self.blue.x == x && gs->self.blue.y == y && gs->self.blue.dir == d);
+}
+
+portal* other_portal(game_state* gs, unsigned x, unsigned y, direction d) {
+	if (gs->opponent.orange.x == x && gs->opponent.orange.y == y && gs->opponent.orange.dir == d) {
+		return gs->opponent.blue.x != -1 && gs->opponent.blue.y != -1 ? &gs->opponent.blue : NULL;
+	} else if (gs->opponent.blue.x == x && gs->opponent.blue.y == y && gs->opponent.blue.dir == d) {
+		return gs->opponent.orange.x != -1 && gs->opponent.orange.y != -1 ? &gs->opponent.orange : NULL;
+	} else if (gs->self.orange.x == x && gs->self.orange.y == y && gs->self.orange.dir == d) {
+		return gs->self.blue.x != -1 && gs->self.blue.y != -1 ? &gs->self.blue : NULL;
+	} else if (gs->self.blue.x == x && gs->self.blue.y == y && gs->self.blue.dir == d) {
+		return gs->self.orange.x != -1 && gs->self.orange.y != -1 ? &gs->self.orange : NULL;
+	} else {
+		return NULL;
+	}
+}
+
+void place_future_trails(unsigned* thresh, bomb* bomb, unsigned fuse, game_state* gs, unsigned* axis, int dir) {
+	unsigned i, true_range = bomb->range, orig_x = bomb->x, orig_y = bomb->y;
+	portal* p;
+	for (i = 1; i <= true_range; ++i) {
 		*axis += dir;
-		if (gs->hard_block_board[xy_to_index(gs,bomb->x,bomb->y)] || gs->soft_block_board[xy_to_index(gs,bomb->y,bomb->x)]) {
-			true_range = min(true_range, diff(*axis,backup) + bomb->pierce);
-		} else if (thresh[xy_to_index(gs,bomb->x,bomb->y)] > bomb->tick) {
-			thresh[xy_to_index(gs,bomb->x,bomb->y)] = bomb->tick;
+		if (*axis > gs->board_length) {
+			break;
+		}
+		if ((p = other_portal(gs, bomb->x, bomb->y, rev_trail_direction(bomb, axis, dir))) != NULL) {
+			bomb->x = p->x;
+			bomb->y = p->y;
+			direction_to_axis_dir(p->dir, bomb, &axis, &dir);
+			*axis += dir;
+		}
+		if (gs->hard_block_board[xy_to_index(gs,bomb->x,bomb->y)] || gs->soft_block_board[xy_to_index(gs,bomb->x,bomb->y)]) {
+			true_range = min(true_range, i + bomb->pierce);
+		} else if (thresh[xy_to_index(gs,bomb->x,bomb->y)] > fuse) {
+			thresh[xy_to_index(gs,bomb->x,bomb->y)] = fuse;
 		}
 	}
-	*axis = backup;
+	bomb->x = orig_x;
+	bomb->y = orig_y;
+}
+
+void sort_bombs(unsigned* ordering, bomb* bombs, unsigned num_bombs) {
+	unsigned i, j, k, min_fuse;
+	for (i = 0; i < num_bombs; ++i) {
+		min_fuse = -1;
+		for (j = 0; j < num_bombs; ++j) {
+			if (bombs[j].tick < min_fuse) {
+				for (k = 0; k < i; ++k) {
+					if (ordering[k] == j) {
+						break;
+					}
+				}
+				if (k == i) {
+					ordering[i] = j;
+					min_fuse = bombs[j].tick;
+				}
+			}
+		}
+	}
 }
 
 void bomb_thresholds(unsigned* thresh, game_state* gs) {
-	unsigned i;
+	unsigned i, *ordered, fuse;
+	ordered = (unsigned*) malloc(gs->num_bombs*sizeof(unsigned));
+	sort_bombs(ordered, gs->bombs, gs->num_bombs);
 	for (i = 0; i < num_cells(gs); ++i) {
 		thresh[i] = -1;
 	}
 	for (i = 0; i < gs->num_bombs; ++i) {
-		thresh[xy_to_index(gs, gs->bombs[i].x, gs->bombs[i].y)] = 0;
-		place_future_trails(thresh, &gs->bombs[i], gs, &gs->bombs[i].x, 1);
-		place_future_trails(thresh, &gs->bombs[i], gs, &gs->bombs[i].x, -1);
-		place_future_trails(thresh, &gs->bombs[i], gs, &gs->bombs[i].y, 1);
-		place_future_trails(thresh, &gs->bombs[i], gs, &gs->bombs[i].y, -1);
+		fuse = min(thresh[xy_to_index(gs, gs->bombs[ordered[i]].x, gs->bombs[ordered[i]].y)], gs->bombs[ordered[i]].tick);
+		thresh[xy_to_index(gs, gs->bombs[ordered[i]].x, gs->bombs[ordered[i]].y)] = 0;
+		place_future_trails(thresh, &gs->bombs[ordered[i]], fuse, gs, &gs->bombs[ordered[i]].x, 1);
+		place_future_trails(thresh, &gs->bombs[ordered[i]], fuse, gs, &gs->bombs[ordered[i]].x, -1);
+		place_future_trails(thresh, &gs->bombs[ordered[i]], fuse, gs, &gs->bombs[ordered[i]].y, 1);
+		place_future_trails(thresh, &gs->bombs[ordered[i]], fuse, gs, &gs->bombs[ordered[i]].y, -1);
 	}
+	free(ordered);
 }
 
 unsigned taxicab(unsigned x1, unsigned y1, unsigned x2, unsigned y2) {
