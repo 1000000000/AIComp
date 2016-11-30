@@ -138,7 +138,8 @@ game_state* extract_state(json_object* game) {
 			json_object_object_get_ex(cur1, "tick", &cur2);
 			new_state->bombs[num_bombs].tick = json_object_get_int(cur2);
 			json_object_object_get_ex(cur1, "owner", &cur2);
-			if (json_object_get_int(cur2) == player_index) {
+			new_state->bombs[num_bombs].ours = json_object_get_int(cur2) == player_index;
+			if (new_state->bombs[num_bombs].ours) {
 				++new_state->self.bomb_count_max;
 				new_state->bombs[num_bombs].range = new_state->self.bomb_range;
 				new_state->bombs[num_bombs].pierce = new_state->self.bomb_pierce;

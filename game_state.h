@@ -10,6 +10,7 @@ typedef struct trail {
 } trail;
 
 typedef struct bomb {
+	int ours; // bool
 	unsigned x, y, tick, range, pierce;
 } bomb;
 
