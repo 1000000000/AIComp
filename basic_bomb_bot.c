@@ -295,39 +295,57 @@ unsigned taxicab(unsigned x1, unsigned y1, unsigned x2, unsigned y2) {
 	return diff(x1,x2) + diff(y1,y2);
 }
 
-move_enum next_step_to_dest(unsigned* dists, game_state* gs, unsigned dx, unsigned dy) {
+move_enum next_step_to_dest(unsigned* dists, game_state* gs, unsigned tx, unsigned ty) {
 	unsigned cur_dist;
-	while (taxicab(gs->self.x, gs->self.y, dx, dy) > 1) {
-		cur_dist = dists[xy_to_index(gs,dx,dy)];
-		if (dx + 1 < gs->board_length && dists[xy_to_index(gs,dx+1,dy)] < cur_dist) {
-			++dx;
-		} else if (dy + 1 < gs->board_length && dists[xy_to_index(gs,dx,dy+1)] < cur_dist) {
-			++dy;
-		} else if (dx > 0 && dists[xy_to_index(gs,dx-1,dy)] < cur_dist) {
-			--dx;
-		} else if (dy > 0 && dists[xy_to_index(gs,dx,dy-1)] < cur_dist) {
-			--dy;
-		} else {
-			return TURN_UP;
+	int dx, dy;
+	while (taxicab(gs->self.x, gs->self.y, tx, ty) > 1) {
+		cur_dist = dists[xy_to_index(gs,tx,ty)];
+		dx = dy = 0;
+		if (tx + 1 < gs->board_length && dists[xy_to_index(gs,tx+1,ty)] < cur_dist) {
+			dx = 1;
+			dy = 0;
+			cur_dist = dists[xy_to_index(gs,tx+1,ty)];
 		}
+		if (ty + 1 < gs->board_length && dists[xy_to_index(gs,tx,ty+1)] < cur_dist) {
+			dx = 0;
+			dy = 1;
+			cur_dist = dists[xy_to_index(gs,tx,ty+1)];
+		}
+		if (tx > 0 && dists[xy_to_index(gs,tx-1,ty)] < cur_dist) {
+			dx = -1;
+			dy = 0;
+			cur_dist = dists[xy_to_index(gs,tx-1,ty)];
+		}
+		if (ty > 0 && dists[xy_to_index(gs,tx,ty-1)] < cur_dist) {
+			dx = 0;
+			dy = -1;
+			cur_dist = dists[xy_to_index(gs,tx,ty-1)];
+		}
+		if (dx == 0 && dy == 0) {
+			fprintf(stderr "Found bad distance local minimum at (%u, %u)\n", tx, ty);
+			return NONE;
+		}
+		tx += dx;
+		ty += dy;
 	}
-	if (dists[xy_to_index(gs, dx, dy)] > 1) {
+	if (dists[xy_to_index(gs, tx, ty)] > 1) {
 		return NONE;
 	}
-	if (diff(gs->self.x, dx) > 0) {
-		if (gs->self.x < dx) {
+	if (diff(gs->self.x, tx) > 0) {
+		if (gs->self.x < tx) {
 			return MOVE_RIGHT;
 		} else {
 			return MOVE_LEFT;
 		}
-	} else if (diff(gs->self.y, dy) > 0) {
-		if (gs->self.y < dy) {
+	} else if (diff(gs->self.y, ty) > 0) {
+		if (gs->self.y < ty) {
 			return MOVE_DOWN;
 		} else {
 			return MOVE_UP;
 		}
 	} else {
-		return TURN_LEFT;
+		fprintf(stderr, "Somehow our next step wound up being our current position\n");
+		return NONE;
 	}
 }
 
@@ -378,7 +396,8 @@ move_enum next_move(ai_state* state, game_state* gs) {
 	printf("Destination: (%u,%u)\n", bestx, besty);
 #endif
 	if (bestx == -1 || besty == -1) {
-		return TURN_RIGHT;
+		fprintf(stderr, "It appears we are stuck, might as well go out with a bang!\n");
+		return PLACE_BOMB;
 	}
 	if (gs->self.bomb_count_cur != 0 && gs->self.x == bestx && gs->self.y == besty) {
 		return PLACE_BOMB;
