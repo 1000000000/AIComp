@@ -74,6 +74,16 @@ int is_bomb(game_state* gs, unsigned x, unsigned y) {
 	return 0;
 }
 
+unsigned time_till_bomb(game_state* gs) {
+	unsigned i, min_tick = -1;
+	for (i = 0; i < gs->num_bombs; ++i) {
+		if (gs->bombs[i].ours && gs->bombs[i].tick < min_tick) {
+			min_tick = gs->bombs[i].tick;
+		}
+	}
+	return min_tick;
+}
+
 int is_wall(game_state* gs, unsigned x, unsigned y) {
 	return gs->hard_block_board[xy_to_index(gs,x,y)]
 		|| gs->soft_block_board[xy_to_index(gs,x,y)];
