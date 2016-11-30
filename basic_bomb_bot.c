@@ -80,16 +80,16 @@ int is_wall(game_state* gs, unsigned x, unsigned y) {
 }
 
 int is_walkable(game_state* gs, unsigned x, unsigned y) {
-	return !is_wall(gs, x, y);
+	return !is_wall(gs, x, y)
 		&& !is_bomb(gs, x, y)
 		&& gs->opponent.x != x && gs->opponent.y != y;
 }
 
-unsigned trail_tick(gs, unsigned x, unsigned y) {
+unsigned trail_tick(game_state* gs, unsigned x, unsigned y) {
 	unsigned i;
 	for (i = 0; i < gs->num_trails; ++i) {
 		if (gs->trails[i].x == x && gs->trails[i].y == y) {
-			return gs->trails[i].tick;
+			return gs->trails[i].tick + 1;
 		}
 	}
 	return 0;
@@ -105,7 +105,9 @@ int exists_path(game_state* gs, int* visited, unsigned sx, unsigned sy, unsigned
 		return 1;
 	}
 	if (visited == NULL) {
-		vds = (unsigned*) calloc(num_cells(gs), sizeof(unsigned));
+		vds = (int*) calloc(num_cells(gs), sizeof(int));
+	} else if (visited[xy_to_index(gs, sx, sy)]) {
+		return 0;
 	} else {
 		vds = visited;
 	}
@@ -153,20 +155,20 @@ void bfs(unsigned* dists, unsigned* thresh, game_state* gs) {
 				best_ind = i;
 			}
 		}
-		index_to_xy(gs, queue[best], &x, &y);
+		index_to_xy(gs, queue[best_ind], &x, &y);
 		if (x > 0) {
-			add_to_queue(dists, thresh, gs, x-1, y, queue, best, &end);
+			add_to_queue(dists, thresh, gs, x-1, y, queue, best_ind, &end);
 		}
 		if (x + 1 < gs->board_length) {
-			add_to_queue(dists, thresh, gs, x+1, y, queue, best, &end);
+			add_to_queue(dists, thresh, gs, x+1, y, queue, best_ind, &end);
 		}
 		if (y > 0) {
-			add_to_queue(dists, thresh, gs, x, y-1, queue, best, &end);
+			add_to_queue(dists, thresh, gs, x, y-1, queue, best_ind, &end);
 		}
 		if (y + 1 < gs->board_length) {
-			add_to_queue(dists, thresh, gs, x, y+1, queue, best, &end);
+			add_to_queue(dists, thresh, gs, x, y+1, queue, best_ind, &end);
 		}
-		queue[best] = queue[start];
+		queue[best_ind] = queue[start];
 		++start;
 	}
 	free(queue);
@@ -298,6 +300,9 @@ move_enum next_step_to_dest(unsigned* dists, game_state* gs, unsigned dx, unsign
 		} else {
 			return TURN_UP;
 		}
+	}
+	if (dists[xy_to_index(gs, dx, dy)] > 1) {
+		return NONE;
 	}
 	if (diff(gs->self.x, dx) > 0) {
 		if (gs->self.x < dx) {
