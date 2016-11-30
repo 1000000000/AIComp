@@ -4,14 +4,39 @@
 #include <stdlib.h>
 
 typedef struct ai_state {
-	int uninit;
+	int uninit, done_mining;
 	unsigned* dists, *thresh;
 } ai_state;
 
 ai_state* ai_state_init() {
 	ai_state* new_state = (ai_state*) malloc(sizeof(ai_state));
 	new_state->uninit = 1;
+	new_state->done_mining = 0;
 	return new_state;
+}
+
+unsigned diff(unsigned a, unsigned b) {
+	if (a > b) {
+		return a - b;
+	} else {
+		return b - a;
+	}
+}
+
+unsigned max(unsigned a, unsigned b) {
+	if (a > b) {
+		return a;
+	} else {
+		return b;
+	}
+}
+
+unsigned min(unsigned a, unsigned b) {
+	if (a > b) {
+		return b;
+	} else {
+		return a;
+	}
 }
 
 unsigned num_cells(game_state* gs) {
@@ -39,39 +64,76 @@ void first_run_init(ai_state* state, game_state* gs) {
 	state->thresh = (unsigned*) malloc(num_cells(gs)*sizeof(unsigned));
 }
 
-int is_bomb_or_trail(game_state* gs, unsigned x, unsigned y) {
+int is_bomb(game_state* gs, unsigned x, unsigned y) {
 	unsigned i;
 	for (i = 0; i < gs->num_bombs; ++i) {
 		if (gs->bombs[i].x == x && gs->bombs[i].y == y) {
 			return 1;
 		}
 	}
+	return 0;
+}
+
+int is_wall(game_state* gs, unsigned x, unsigned y) {
+	return gs->hard_block_board[xy_to_index(gs,x,y)]
+		|| gs->soft_block_board[xy_to_index(gs,x,y)];
+}
+
+int is_walkable(game_state* gs, unsigned x, unsigned y) {
+	return !is_wall(gs, x, y);
+		&& !is_bomb(gs, x, y)
+		&& gs->opponent.x != x && gs->opponent.y != y;
+}
+
+unsigned trail_tick(gs, unsigned x, unsigned y) {
+	unsigned i;
 	for (i = 0; i < gs->num_trails; ++i) {
 		if (gs->trails[i].x == x && gs->trails[i].y == y) {
-			return 1;
+			return gs->trails[i].tick;
 		}
 	}
 	return 0;
 }
 
-int is_walkable(game_state* gs, unsigned x, unsigned y) {
-	return !gs->hard_block_board[xy_to_index(gs,x,y)]
-		&& !gs->soft_block_board[xy_to_index(gs,x,y)]
-		&& !is_bomb_or_trail(gs, x, y)
-		&& gs->opponent.x != x && gs->opponent.y != y;
+int exists_path(game_state* gs, int* visited, unsigned sx, unsigned sy, unsigned tx, unsigned ty) {
+	int ret;
+	int* vds;
+	if (is_wall(gs, tx, ty) || is_wall(gs, sx, sy)) {
+		return 0;
+	}
+	if (sx == tx && sy == ty) {
+		return 1;
+	}
+	if (visited == NULL) {
+		vds = (unsigned*) calloc(num_cells(gs), sizeof(unsigned));
+	} else {
+		vds = visited;
+	}
+	vds[xy_to_index(gs,sx,sy)] = 1;
+	ret =  (sx > 0 && exists_path(gs, vds, sx - 1, sy, tx, ty))
+		|| (sy > 0 && exists_path(gs, vds, sx, sy - 1, tx, ty))
+		|| (sx + 1 < gs->board_length && exists_path(gs, vds, sx + 1, sy, tx, ty))
+		|| (sy + 1 < gs->board_length && exists_path(gs, vds, sx, sy + 1, tx, ty));
+	vds[xy_to_index(gs,sx,sy)] = 0;
+	if (visited == NULL) {
+		free(vds);
+	}
+	return ret;
 }
 
 void add_to_queue(unsigned* dists, unsigned* thresh, game_state* gs, unsigned x, unsigned y, unsigned* queue, unsigned start, unsigned* end) {
-	unsigned index = xy_to_index(gs, x, y);
-	if (dists[index] == -1 && dists[queue[start]] + 1 < thresh[index] && is_walkable(gs,x,y)) {
-		dists[index] = dists[queue[start]] + 1;
-		queue[*end] = index;
-		*end = *end + 1;
+	unsigned index = xy_to_index(gs, x, y), new_dist = max(dists[queue[start]] + 1, trail_tick(gs, x, y));
+	if (dists[index] > new_dist && new_dist < thresh[index] && is_walkable(gs,x,y)) {
+		if (dists[index] == -1) {
+			queue[*end] = index;
+			*end = *end + 1;
+		}
+		dists[index] = new_dist;
 	}
 }
 
 void bfs(unsigned* dists, unsigned* thresh, game_state* gs) {
-	unsigned i, x, y, *queue, end, start;
+	unsigned i, x, y, *queue, end, start, best, best_ind;
 	for (i = 0; i < num_cells(gs); ++i) {
 		dists[i] = -1;
 	}
@@ -83,38 +145,31 @@ void bfs(unsigned* dists, unsigned* thresh, game_state* gs) {
 	start = 0;
 	end = 1;
 	while (start != end) {
-		index_to_xy(gs, queue[start], &x, &y);
+		best = dists[queue[start]];
+		best_ind = start;
+		for (i = start + 1; i < end; ++i) {
+			if (dists[queue[i]] < best) {
+				best = dists[queue[i]];
+				best_ind = i;
+			}
+		}
+		index_to_xy(gs, queue[best], &x, &y);
 		if (x > 0) {
-			add_to_queue(dists, thresh, gs, x-1, y, queue, start, &end);
+			add_to_queue(dists, thresh, gs, x-1, y, queue, best, &end);
 		}
 		if (x + 1 < gs->board_length) {
-			add_to_queue(dists, thresh, gs, x+1, y, queue, start, &end);
+			add_to_queue(dists, thresh, gs, x+1, y, queue, best, &end);
 		}
 		if (y > 0) {
-			add_to_queue(dists, thresh, gs, x, y-1, queue, start, &end);
+			add_to_queue(dists, thresh, gs, x, y-1, queue, best, &end);
 		}
 		if (y + 1 < gs->board_length) {
-			add_to_queue(dists, thresh, gs, x, y+1, queue, start, &end);
+			add_to_queue(dists, thresh, gs, x, y+1, queue, best, &end);
 		}
+		queue[best] = queue[start];
 		++start;
 	}
 	free(queue);
-}
-
-unsigned diff(unsigned a, unsigned b) {
-	if (a > b) {
-		return a - b;
-	} else {
-		return b - a;
-	}
-}
-
-unsigned min(unsigned a, unsigned b) {
-	if (a > b) {
-		return b;
-	} else {
-		return a;
-	}
 }
 
 direction rev_trail_direction(bomb* bomb, unsigned* axis, int dir) {
@@ -265,6 +320,11 @@ move_enum next_move(ai_state* state, game_state* gs) {
 	unsigned i, x, y, bestx = -1, besty = -1, best_score = -1;
 	if (state->uninit) {
 		first_run_init(state, gs);
+	}
+	if (!state->done_mining &&
+			(exists_path(gs, NULL, gs->self.x, gs->self.y, gs->board_length/2, gs->board_length/2)
+			 || exists_path(gs, NULL, gs->self.x, gs->self.y, gs->opponent.x, gs->opponent.y))) {
+		state->done_mining = 1;
 	}
 	bomb_thresholds(state->thresh, gs);
 #ifdef DEBUG
