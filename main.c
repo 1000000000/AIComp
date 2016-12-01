@@ -171,7 +171,7 @@ int main(int argc, char *argv[]) {
 #endif
 
 	hnd = curl_easy_init();
-	curl_easy_setopt(hnd, CURLOPT_URL, "http://aicomp.io/api/games/practice");
+	curl_easy_setopt(hnd, CURLOPT_URL, "http://aicomp.io/api/games/search");
 	curl_easy_setopt(hnd, CURLOPT_POSTFIELDS, START_GAME_POST);
 	curl_easy_setopt(hnd, CURLOPT_WRITEDATA, (void*) fresp);
 
@@ -209,7 +209,7 @@ int main(int argc, char *argv[]) {
 			ret = curl_easy_perform(hnd);
 			fflush(fresp);
 #ifdef DEBUG
-			sleep(1);
+			//sleep(1);
 #endif
 			jresp = json_tokener_parse(resp);
 	    }
