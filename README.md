@@ -4,7 +4,9 @@
 ### Description:
 Plays Deterministic Bomberman with Portals
 
-Currently makes random moves without checking anything about the response
+`basic_bomb_bot` attempts to get as close to its opponent as possible while placing and avoiding bombs.
+
+`rand_bot` makes moves at random.
 
 ---
 ### Setup
